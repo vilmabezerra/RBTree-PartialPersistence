@@ -1,5 +1,9 @@
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Random;
 import java.util.Scanner;
 
 //import TreePrinter.PrintableNode;
@@ -15,24 +19,60 @@ public class RedBlackTree{
 
     private final int RED = 0;
     private final static int BLACK = 1;
+    
+    
 
     /* 
      * Tree Node class
      * */
-    public static class RedBlackNode {
+    private static class RedBlackNode {
         
-	    	int key = -1, color = BLACK;
-	    RedBlackNode left = nil, right = nil, parent = nil;
+	    	private int key = -1, color = BLACK;
+	    private RedBlackNode left = nil, right = nil, parent = nil;
+	    private Map<Long, RedBlackNode> versions = new HashMap<Long, RedBlackNode>();
 	        
 	
 	    	RedBlackNode(int key) {
 	        this.key = key;
+	        addNodeVersion();
 	    } 
+	    	/*
+	    	 * Setters that shall set node attribute as well as 
+	    	 * add a new node version for each time one of them is called
+	    	 * 
+	    	 * */
+	    	
+	    	public void setColor(int color) {
+	    		this.color = color;
+	    		addNodeVersion();
+	    	}
+	    	
+	    public void setLeft(RedBlackNode node) {
+	    		this.left = node;
+	    		addNodeVersion();
+	    	}
+	    	
+	    public void setRight(RedBlackNode node) {
+	    		this.right = node;
+	    		addNodeVersion();
+	    	}
+	    	
+	    	
+	    	/*
+	    	 * Add new version of this node
+	    	 * 
+	    	 * */
+	    private void	addNodeVersion() {
+	    		Long msec = System.nanoTime();
+	    		versions.put(msec, this);
+	    		System.out.println("added " + this.key + " version msec:"+ msec + " Node:"+ versions.get(msec).key);
+	    }
     }
 
     private final static RedBlackNode nil = new RedBlackNode(-1); 
     private RedBlackNode root = nil;
 	private Scanner scan;
+	private Map<Long, RedBlackNode> rbVersions = new HashMap<Long, RedBlackNode>();
     
 
     /**
@@ -153,7 +193,7 @@ public class RedBlackTree{
     private String nodeColorString(int color) {
 		String col = null;
 		if (color == 0) {
-			col = "\u001b[1;31mR\u001b[0m";
+			col = "R";
 		}else {
 			if (color == 1) {
 				col = "B";
@@ -193,16 +233,17 @@ public class RedBlackTree{
 
     private void insert(RedBlackNode node) {
     		RedBlackNode temp = root;
+    		
         if (root == nil) {
             root = node;
-            node.color = BLACK;
+            node.setColor(BLACK);
             node.parent = nil;
         } else {
-            node.color = RED;
+            node.setColor(RED);
             while (true) {
                 if (node.key < temp.key) {
                     if (temp.left == nil) {
-                        temp.left = node;
+                        temp.setLeft(node);
                         node.parent = temp;
                         break;
                     } else {
@@ -210,7 +251,7 @@ public class RedBlackTree{
                     }
                 } else if (node.key >= temp.key) {
                     if (temp.right == nil) {
-                        temp.right = node;
+                        temp.setRight(node);
                         node.parent = temp;
                         break;
                     } else {
@@ -220,19 +261,35 @@ public class RedBlackTree{
             }
             fixTree(node);
         }
+        
+        addTreeVersion(root);
     }
 
-    //Takes as argument the newly inserted node
+    /*
+     * Add new version of tree on Map. 
+     * 
+     * It is used in insert and remove items methods
+     * */
+    private void addTreeVersion(RedBlackNode root) {
+    		Long msec = System.nanoTime();
+    		
+		rbVersions.put(msec, root);
+		
+		System.out.println("Tree msec:"+ msec + " Root:"+ rbVersions.get(msec).key);
+	}
+
+	//Takes as argument the newly inserted node
     private void fixTree(RedBlackNode node) {
         while (node.parent.color == RED) {
         		RedBlackNode uncle = nil;
             if (node.parent == node.parent.parent.left) {
-                uncle = node.parent.parent.right;
+            	
+                uncle= node.parent.parent.right;
 
                 if (uncle != nil && uncle.color == RED) {
-                    node.parent.color = BLACK;
-                    uncle.color = BLACK;
-                    node.parent.parent.color = RED;
+                    node.parent.setColor(BLACK);
+                    uncle.setColor(BLACK);
+                    node.parent.parent.setColor(RED);
                     node = node.parent.parent;
                     continue;
                 } 
@@ -241,17 +298,18 @@ public class RedBlackTree{
                     node = node.parent;
                     rotateLeft(node);
                 } 
-                node.parent.color = BLACK;
-                node.parent.parent.color = RED;
+                node.parent.setColor(BLACK);
+                node.parent.parent.setColor(RED);
+                
                 //if the "else if" code hasn't executed, this
                 //is a case where we only need a single rotation 
                 rotateRight(node.parent.parent);
             } else {
                 uncle = node.parent.parent.left;
                  if (uncle != nil && uncle.color == RED) {
-                    node.parent.color = BLACK;
-                    uncle.color = BLACK;
-                    node.parent.parent.color = RED;
+                    node.parent.setColor(BLACK);
+                    uncle.setColor(BLACK);
+                    node.parent.parent.setColor(RED);
                     node = node.parent.parent;
                     continue;
                 }
@@ -273,23 +331,23 @@ public class RedBlackTree{
     void rotateLeft(RedBlackNode node) {
         if (node.parent != nil) {
             if (node == node.parent.left) {
-                node.parent.left = node.right;
+                node.parent.setLeft(node.right);
             } else {
-                node.parent.right = node.right;
+                node.parent.setRight(node.right);
             }
             node.right.parent = node.parent;
             node.parent = node.right;
             if (node.right.left != nil) {
                 node.right.left.parent = node;
             }
-            node.right = node.right.left;
-            node.parent.left = node;
+            node.setRight(node.right.left);
+            node.parent.setLeft(node);
         } else {//Need to rotate root
         		RedBlackNode right = root.right;
-            root.right = right.left;
+            root.setRight(right.left);
             right.left.parent = root;
             root.parent = right;
-            right.left = root;
+            right.setLeft(root);
             right.parent = nil;
             root = right;
         }
@@ -298,9 +356,9 @@ public class RedBlackTree{
     void rotateRight(RedBlackNode node) {
         if (node.parent != nil) {
             if (node == node.parent.left) {
-                node.parent.left = node.left;
+                node.parent.setLeft(node.left);
             } else {
-                node.parent.right = node.left;
+                node.parent.setRight(node.left);
             }
 
             node.left.parent = node.parent;
@@ -308,14 +366,14 @@ public class RedBlackTree{
             if (node.left.right != nil) {
                 node.left.right.parent = node;
             }
-            node.left = node.left.right;
-            node.parent.right = node;
+            node.setLeft(node.left.right);
+            node.parent.setRight(node);
         } else {//Need to rotate root
         		RedBlackNode left = root.left;
-            root.left = root.left.right;
+            root.setLeft(root.left.right);
             left.right.parent = root;
             root.parent = left;
-            left.right = root;
+            left.setRight(root);
             left.parent = nil;
             root = left;
         }
@@ -324,6 +382,7 @@ public class RedBlackTree{
     //Deletes whole tree
     void deleteTree(){
         root = nil;
+        addTreeVersion(root);
     }
     
     //Deletion Code .
@@ -335,14 +394,21 @@ public class RedBlackTree{
           if(target.parent == nil){
               root = with;
           }else if(target == target.parent.left){
-              target.parent.left = with;
+              target.parent.setLeft(with);
           }else
-              target.parent.right = with;
+              target.parent.setRight(with);
           with.parent = target.parent;
     }
     
+    /*
+     * Delete a node. 
+     * 
+     * Returns true when successfully deleted and false when it does not exist
+     * 
+     * */
     boolean delete(RedBlackNode z){
-        if((z = findNode(z, root))==null)return false;
+        if((z = findNode(z, root)) == null) return false;
+        
         RedBlackNode x;
         RedBlackNode y = z; // temporary reference y
         int y_original_color = y.color;
@@ -361,16 +427,19 @@ public class RedBlackTree{
                 x.parent = y;
             else{
                 transplant(y, y.right);
-                y.right = z.right;
+                y.setRight(z.right);
                 y.right.parent = y;
             }
             transplant(z, y);
-            y.left = z.left;
+            y.setLeft(z.left);
             y.left.parent = y;
-            y.color = z.color; 
+            y.setColor(z.color); 
         }
+        
         if(y_original_color==BLACK)
-            deleteFixup(x);  
+            deleteFixup(x); 
+        
+        addTreeVersion(root);
         return true;
     }
     
@@ -379,52 +448,52 @@ public class RedBlackTree{
             if(x == x.parent.left){
             		RedBlackNode w = x.parent.right;
                 if(w.color == RED){
-                    w.color = BLACK;
-                    x.parent.color = RED;
+                    w.setColor(BLACK);
+                    x.parent.setColor(RED);
                     rotateLeft(x.parent);
                     w = x.parent.right;
                 }
                 if(w.left.color == BLACK && w.right.color == BLACK){
-                    w.color = RED;
+                    w.setColor(RED);
                     x = x.parent;
                     continue;
                 }
                 else if(w.right.color == BLACK){
-                    w.left.color = BLACK;
-                    w.color = RED;
+                    w.left.setColor(BLACK);
+                    w.setColor(RED);
                     rotateRight(w);
                     w = x.parent.right;
                 }
                 if(w.right.color == RED){
-                    w.color = x.parent.color;
-                    x.parent.color = BLACK;
-                    w.right.color = BLACK;
+                    w.setColor(x.parent.color);
+                    x.parent.setColor(BLACK);
+                    w.right.setColor(BLACK);
                     rotateLeft(x.parent);
                     x = root;
                 }
             }else{
             		RedBlackNode w = x.parent.left;
                 if(w.color == RED){
-                    w.color = BLACK;
-                    x.parent.color = RED;
+                    w.setColor(BLACK);
+                    x.parent.setColor(RED);
                     rotateRight(x.parent);
                     w = x.parent.left;
                 }
                 if(w.right.color == BLACK && w.left.color == BLACK){
-                    w.color = RED;
+                    w.setColor(RED);
                     x = x.parent;
                     continue;
                 }
                 else if(w.left.color == BLACK){
-                    w.right.color = BLACK;
-                    w.color = RED;
+                    w.right.setColor(BLACK);
+                    w.setColor(RED);
                     rotateLeft(w);
                     w = x.parent.left;
                 }
                 if(w.left.color == RED){
-                    w.color = x.parent.color;
-                    x.parent.color = BLACK;
-                    w.left.color = BLACK;
+                    w.setColor(x.parent.color);
+                    x.parent.setColor(BLACK);
+                    w.left.setColor(BLACK);
                     rotateRight(x.parent);
                     x = root;
                 }
@@ -440,22 +509,99 @@ public class RedBlackTree{
         return subTreeRoot;
     }
     
+    private void addNodesRandomly(int r) {
+    		Random random = new Random();
+    		int max = 1000, min = -998, value = 0;
+    		RedBlackNode node;
+    		
+		while(r > 0) {
+			value = random.nextInt(max + 1 -min) + min; 
+			node =  new RedBlackNode(value);
+			insert(node);
+			r--;
+		}
+	}
+    
+    
+    private void deleteNodesRandomly(int half) {
+    		int max = 0, value = 0;
+    		Random random = new Random();
+    		RedBlackNode node;
+    		
+    		while(half > 0) {
+    			max = countNodes(root);
+    			value = 0;
+    			
+    			List<RedBlackNode> nodes = new ArrayList<RedBlackNode>();
+    			nodes = getNodes(root, nodes);
+    			
+    			
+    			value = random.nextInt(max) + 1; 
+    			node =  nodes.get(value);
+    			System.out.println("Deleting "+ node.key);
+    			delete(node);
+    			half--;
+    		}
+    		
+	}
+    
+    private int countNodes(RedBlackNode node) {
+        int total = 0;
+        if (node == null) {
+            return 0;
+        }
+        total += countNodes(node.left);
+        total += countNodes(node.right);
+
+        if(node != nil){
+            total++;
+        }
+        return total;
+    }
+    
+    private List<RedBlackNode> getNodes(RedBlackNode node, List<RedBlackNode> nodes) {      
+        if (node == nil) {
+            return nodes;
+        }
+        getNodes(node.left, nodes);
+        getNodes(node.right, nodes);
+
+        if(node != nil){
+            nodes.add(node);
+        }
+        return nodes;
+    }
+    
+    
     public void consoleUI() {
         scan = new Scanner(System.in);
         while (true) {
-            System.out.println("\n1. Add 2r items\n"
-                    + "2. Delete r items\n"
+            System.out.println("\n1. Add R random items\n"
+                    + "2. Delete half of the nodes randomly\n"
                     + "3. Add items\n"
                     + "4. Delete items\n"
                     + "5. Check items\n"
                     + "6. Print tree\n"
                     + "7. Delete tree\n"
-                    + "\u001b[1;31m-999 to Exit a Command\u001b[0m");
+                    + "8. List Tree Versions\n"
+                    + "9. Print Tree Version\n"
+                    + "\u001b[1;31m-999 to Exit Commands 3, 4 and 5\u001b[0m");
             int choice = scan.nextInt();
 
             int item;
+            long version;
             	RedBlackNode node;
             switch (choice) {
+            		case 1:
+            			int R = scan.nextInt();
+            			addNodesRandomly(R);
+            			printTree(root);
+            			break;
+            		case 2:
+            			int total = countNodes(root);
+            			deleteNodesRandomly(total/2);
+            			printTree(root);
+            			break;
                 case 3:
                     item = scan.nextInt();
                     while (item != -999) {
@@ -495,10 +641,43 @@ public class RedBlackTree{
                     deleteTree();
                     System.out.println("Tree deleted!");
                     break;
+                case 8:
+                		listTreeVersions();
+                		break;
+                case 9:
+                		version = scan.nextLong();
+                		accessTreeVersion(version);
+                		break;
             }
         }
     }
-    public static void main(String[] args) {
+    
+
+	private void listTreeVersions() {
+		for (Map.Entry<Long, RedBlackNode> entry : rbVersions.entrySet())
+		{
+		    System.out.println("Key: "+ entry.getKey() + " Root: " + entry.getValue().key);
+		}
+	}
+	
+	private void accessTreeVersion(Long key) {
+		if (rbVersions.containsKey(key)) {
+			   RedBlackNode node = rbVersions.get(key);
+			 System.out.println("Version: "+ key +" Tree: ");
+			 printTreeVersion(node, key);
+		}
+	}
+
+	private void printTreeVersion(RedBlackNode node, Long key) {
+		for (Map.Entry<Long, RedBlackNode> entry : node.versions.entrySet())
+		{
+			if(entry.getKey().equals(key)) {
+		    		System.out.println("Key: "+ entry.getKey() + " Node Left: " + entry.getValue().left.key);
+			}
+		}
+	}
+
+	public static void main(String[] args) {
         RedBlackTree rbt = new RedBlackTree();
         rbt.consoleUI();
     }
